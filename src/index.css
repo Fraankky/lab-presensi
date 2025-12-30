@@ -1,0 +1,61 @@
+@import "tailwindcss";
+
+:root {
+  font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background-color: #f9fafb;
+}
+
+#root {
+  width: 100%;
+}
+
+/* Scanning Animation */
+@keyframes scan-vertical {
+  0% { top: 0%; opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+
+.scan-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.8);
+  box-shadow: 0 0 4px rgba(255, 255, 255, 0.5);
+  animation: scan-vertical 2s linear infinite;
+  z-index: 20;
+}
+
+/* Subtle pulsating gradient for loader */
+@keyframes pulse-ring {
+  0% { transform: scale(0.8); opacity: 0.5; }
+  100% { transform: scale(1.2); opacity: 0; }
+}
+
+.pulse-circle {
+  animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Transition utilities */
+.fade-enter { opacity: 0; transform: scale(0.98); }
+.fade-enter-active { opacity: 1; transform: scale(1); transition: opacity 300ms ease, transform 300ms ease; }
+.fade-exit { opacity: 1; transform: scale(1); }
+.fade-exit-active { opacity: 0; transform: scale(0.98); transition: opacity 300ms ease, transform 300ms ease; }
+
+/* Hide scrollbar */
+::-webkit-scrollbar { display: none; }
