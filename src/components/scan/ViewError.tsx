@@ -12,8 +12,8 @@ export function ViewError({ onRetry }: ViewErrorProps) {
           <Icon name="alert-circle" width={16} className="text-red-600" />
         </div>
         <div>
-          <p className="text-xs font-medium text-red-800 mb-1">Wajah Tidak Dikenali</p>
-          <p className="text-[10px] text-red-600/80 leading-relaxed">
+          <p className="text-m font-medium text-red-800 mb-1">Wajah Tidak Dikenali</p>
+          <p className="text-xs text-red-600/80 leading-relaxed">
             Sistem tidak dapat mencocokkan wajah anda. Silakan coba lagi.
           </p>
         </div>
@@ -21,7 +21,7 @@ export function ViewError({ onRetry }: ViewErrorProps) {
 
       <button
         onClick={onRetry}
-        className="w-full flex items-center justify-center gap-2 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-medium h-9 rounded-md transition-all shadow-sm"
+        className="w-full flex items-center justify-center gap-2 bg-zinc-900 hover:bg-zinc-800 text-white text-s font-medium h-9 rounded-md transition-all shadow-sm"
       >
         <Icon name="refresh-cw" width={14} />
         Coba Lagi
