@@ -13,21 +13,6 @@ export function FaceScanCard() {
   const [scanState, setScanState] = useState<ScanState>('initial');
   const [isCameraColored, setIsCameraColored] = useState(false);
 
-  const handleScanSuccess = () => {
-    setScanState('loading');
-    setTimeout(() => {
-      setScanState('success');
-      setIsCameraColored(true);
-    }, 1500);
-  };
-
-  const handleScanError = () => {
-    setScanState('loading');
-    setTimeout(() => {
-      setScanState('error');
-    }, 1500);
-  };
-
   const handleReset = () => {
     setScanState('initial');
     setIsCameraColored(false);
@@ -58,7 +43,7 @@ export function FaceScanCard() {
         {/* Content Area */}
         <div className="p-8 max-w-lg mx-auto">
           {scanState === 'initial' && (
-            <ViewInitial onScanSuccess={handleScanSuccess} onScanError={handleScanError} />
+            <ViewInitial />
           )}
 
           {scanState === 'success' && (

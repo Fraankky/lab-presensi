@@ -6,3 +6,4 @@ export { ViewInitial } from './ViewInitial';
 export { ViewSuccess } from './ViewSuccess';
 export { ViewError } from './ViewError';
 export { FooterBar } from './FooterBar';
+export { AttendanceListCard } from './AttendanceListCard';

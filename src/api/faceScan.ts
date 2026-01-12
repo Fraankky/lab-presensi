@@ -1,8 +1,8 @@
-import type { ScanFaceRequest } from "../types/scan.types";
+import type { ScanFaceRequest, ScanFaceResponse } from "../types/scan.types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
-export const scanFaceAPI = async (request: ScanFaceRequest): Promise<ScanFaceRequest> => {
+export const scanFaceAPI = async (request: ScanFaceRequest): Promise<ScanFaceResponse> => {
     const formData = new FormData();
     formData.append('image', request.image, 'face.jpg');
 
