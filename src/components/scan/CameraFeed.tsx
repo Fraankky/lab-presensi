@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { initializeCamera, stopCamera } from '../../utils/camera';
-import { initializeTensorFlow } from '../../utils/tfSetup';
 import { useFaceDetector } from '../../hooks/useFaceDetector';
-import { parseFaceDetection } from '../../utils/parseFaceDetection';
+import { initializeTensorFlow } from '../../utils/tfSetup';
 import { transformCoordinates } from '../../utils/coordinateTransform';
 import { validateAlignment } from '../../utils/faceAlignment';
 import { drawGuideOverlay, drawFaceBoundingBox } from '../../utils/canvasDrawing';
+import { parseFaceDetection } from '../../utils/parseFaceDetection';
 import { cropAndResizeFace } from '../../utils/imageCropping';
 import type { AlignmentGuide } from '../../types/faceDetection.types';
 
@@ -13,7 +12,7 @@ interface CameraFeedProps {
   onCameraReady?: (video: HTMLVideoElement, canvas: HTMLCanvasElement) => void;
   onCameraError?: (error: string) => void;
   onFaceCaptured?: (image: Blob) => void;
-  onAlignmentUpdate?: (result: { isAligned: boolean; feedback: string; score: number }) => void;
+  onAlignmentUpdate?: (result: { isAligned: boolean; feedback: string; score: number } | null) => void;
 }
 
 export function CameraFeed({
@@ -32,6 +31,7 @@ export function CameraFeed({
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [isTfReady, setIsTfReady] = useState(false);
+  const [isVideoReady, setIsVideoReady] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
 
   const { detectFaces, loadModel } = useFaceDetector();
@@ -46,17 +46,86 @@ export function CameraFeed({
     initDetection();
   }, [loadModel]);
 
-  // Face detection loop
+  // Initialize camera
   useEffect(() => {
-    if (!isTfReady || !videoRef.current || !overlayCanvasRef.current) return;
+    const setupCamera = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: 'user',
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+        });
+
+        streamRef.current = stream;
+
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          
+          // Wait for video to be ready
+          await new Promise<void>((resolve) => {
+            const video = videoRef.current!;
+            
+            const onLoadedData = () => {
+              if (video.videoWidth > 0 && video.videoHeight > 0) {
+                console.log('✅ Video loaded:', {
+                  dimensions: `${video.videoWidth}x${video.videoHeight}`,
+                  readyState: video.readyState
+                });
+                video.removeEventListener('loadeddata', onLoadedData);
+                resolve();
+              }
+            };
+
+            video.addEventListener('loadeddata', onLoadedData);
+          });
+
+          // Play video
+          await videoRef.current.play();
+          
+          console.log('✅ Video is playing');
+          setIsVideoReady(true);
+          setIsLoading(false);
+
+          if (canvasRef.current) {
+            onCameraReady?.(videoRef.current, canvasRef.current);
+          }
+        }
+      } catch (error) {
+        console.error('Camera error:', error);
+        setHasError(true);
+        setIsLoading(false);
+        onCameraError?.(error instanceof Error ? error.message : 'Failed to access camera');
+      }
+    };
+
+    setupCamera();
+
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [onCameraReady, onCameraError]);
+
+  // Face detection loop - Only runs when both TF and video are ready
+  useEffect(() => {
+    if (!isTfReady || !isVideoReady || !videoRef.current || !overlayCanvasRef.current || !canvasRef.current) {
+      console.log('⏳ Waiting for initialization...', { isTfReady, isVideoReady });
+      return;
+    }
 
     const video = videoRef.current;
+    const canvas = canvasRef.current;
     const overlayCanvas = overlayCanvasRef.current;
 
-    // Set overlay canvas size to match container
+    // Set canvas sizes
     const resizeCanvas = () => {
-      const rect = overlayCanvas.parentElement?.getBoundingClientRect();
+      const rect = canvas.parentElement?.getBoundingClientRect();
       if (rect) {
+        canvas.width = rect.width;
+        canvas.height = rect.height;
         overlayCanvas.width = rect.width;
         overlayCanvas.height = rect.height;
       }
@@ -64,54 +133,12 @@ export function CameraFeed({
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
 
-    // Define alignment guide (slightly above center for face, oval shape)
+    // Define alignment guide
     const guide: AlignmentGuide = {
       x: overlayCanvas.width / 2,
-      y: overlayCanvas.height * 0.45, // Slightly above center for face positioning
+      y: overlayCanvas.height * 0.45,
       width: overlayCanvas.width * 0.65,
       height: overlayCanvas.height * 0.75,
-    };
-
-    const detectLoop = async () => {
-      try {
-        const faces = await detectFaces(video);
-        if (faces.length > 0) {
-          const parsedFace = parseFaceDetection(faces[0]);
-          const transformedFace = transformCoordinates(
-            parsedFace,
-            video.videoWidth,
-            video.videoHeight,
-            overlayCanvas.width,
-            overlayCanvas.height
-          );
-
-          // Validate alignment
-          const alignment = validateAlignment(transformedFace, guide, overlayCanvas.width);
-
-          // Update alignment feedback
-          onAlignmentUpdate?.(alignment);
-
-          // Draw guide and face
-          const guideColor = alignment.isAligned ? 'green' : alignment.score > 50 ? 'yellow' : 'red';
-          drawGuideOverlay(overlayCanvas, guide, guideColor);
-          drawFaceBoundingBox(overlayCanvas, transformedFace);
-
-          // Auto-capture if aligned
-          if (alignment.isAligned && !countdown) {
-            startCountdown();
-          }
-        } else {
-          // No face detected
-          onAlignmentUpdate?.({
-            isAligned: false,
-            feedback: 'Wajah tidak terdeteksi',
-            score: 0
-          });
-          drawGuideOverlay(overlayCanvas, guide, 'red');
-        }
-      } catch (error) {
-        console.error('Detection loop error:', error);
-      }
     };
 
     const startCountdown = () => {
@@ -123,116 +150,177 @@ export function CameraFeed({
         if (count <= 0) {
           captureFace();
         }
-      }, 1000);
+      }, 1000) as unknown as number;
     };
 
     const captureFace = async () => {
-      if (!videoRef.current) return;
       try {
         const imageBlob = await cropAndResizeFace(video, guide);
         onFaceCaptured?.(imageBlob);
         setCountdown(null);
-        clearInterval(countdownRef.current!);
+        if (countdownRef.current) {
+          clearInterval(countdownRef.current);
+        }
       } catch (error) {
         console.error('Capture error:', error);
       }
     };
 
-    // Start detection loop
-    detectionIntervalRef.current = setInterval(detectLoop, 100);
+    // Draw video frame to canvas
+    const drawVideoFrame = () => {
+      const ctx = canvas.getContext('2d');
+      if (!ctx || !video.videoWidth || !video.videoHeight) return;
 
-    return () => {
-      clearInterval(detectionIntervalRef.current!);
-      clearInterval(countdownRef.current!);
-      window.removeEventListener('resize', resizeCanvas);
+      // Calculate scaling to maintain aspect ratio
+      const videoAspectRatio = video.videoWidth / video.videoHeight;
+      const canvasAspectRatio = canvas.width / canvas.height;
+
+      let drawWidth = canvas.width;
+      let drawHeight = canvas.height;
+      let offsetX = 0;
+      let offsetY = 0;
+
+      if (videoAspectRatio > canvasAspectRatio) {
+        // Video is wider - fit to height
+        drawHeight = canvas.height;
+        drawWidth = drawHeight * videoAspectRatio;
+        offsetX = (canvas.width - drawWidth) / 2;
+      } else {
+        // Video is taller - fit to width
+        drawWidth = canvas.width;
+        drawHeight = drawWidth / videoAspectRatio;
+        offsetY = (canvas.height - drawHeight) / 2;
+      }
+
+      // Clear and draw video frame
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(video, offsetX, offsetY, drawWidth, drawHeight);
     };
-  }, [isTfReady, detectFaces, onAlignmentUpdate, onFaceCaptured, countdown]);
 
-  useEffect(() => {
-    let mounted = true;
-
-    const setupCamera = async () => {
+    const detectLoop = async () => {
       try {
-        const stream = await initializeCamera();
+        // Validate video is still ready
+        // if (video.readyState !== 4 || video.paused || video.currentTime === 0) {
+        //   console.warn('⚠️ Video not ready in loop:', {
+        //     readyState: video.readyState,
+        //     paused: video.paused,
+        //     currentTime: video.currentTime
+        //   });
+        //   return;
+        // }
 
-        if (!mounted) {
-          stopCamera(stream);
+        // Draw video frame
+        drawVideoFrame();
+
+        // PENTING: Pass canvas (bukan video) ke detectFaces
+        // Karena TFJS runtime lebih reliable dengan canvas input
+        const faces = await detectFaces(canvas);
+        
+        // Clear overlay canvas
+        const ctx = overlayCanvas.getContext('2d');
+        if (ctx) {
+          ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+        }
+        
+        // Skip jika tidak ada face atau face invalid
+        if (faces.length === 0) {
+          onAlignmentUpdate?.({
+            isAligned: false,
+            feedback: 'Wajah tidak terdeteksi',
+            score: 0
+          });
+          drawGuideOverlay(overlayCanvas, guide, 'red');
           return;
         }
+        
+        const parsedFace = parseFaceDetection(faces[0]);
+        
+        const transformedFace = transformCoordinates(
+          parsedFace,
+          canvas.width,
+          canvas.height,
+          overlayCanvas.width,
+          overlayCanvas.height
+        );
 
-        if (videoRef.current && canvasRef.current) {
-          videoRef.current.srcObject = stream;
-          streamRef.current = stream;
+        const alignment = validateAlignment(transformedFace, guide, overlayCanvas.width);
+        onAlignmentUpdate?.(alignment);
 
-          videoRef.current.onloadedmetadata = () => {
-            setIsLoading(false);
-            if (videoRef.current && canvasRef.current && onCameraReady) {
-              onCameraReady(videoRef.current, canvasRef.current);
-            }
-          };
+        console.log('Alignment:', alignment);
+
+        const guideColor = alignment.isAligned ? 'green' : alignment.score > 50 ? 'yellow' : 'red';
+        drawGuideOverlay(overlayCanvas, guide, guideColor);
+        drawFaceBoundingBox(overlayCanvas, transformedFace);
+
+        if (alignment.isAligned && countdown === null) {
+          startCountdown();
         }
       } catch (error) {
-        if (mounted) {
-          setIsLoading(false);
-          setHasError(true);
-          const errorMessage = error instanceof Error ? error.message : 'Camera error';
-          onCameraError?.(errorMessage);
-        }
+        console.error('Detection loop error:', error);
       }
     };
 
-    setupCamera();
+    console.log('🚀 Starting detection loop...');
+    detectionIntervalRef.current = setInterval(detectLoop, 100) as unknown as number;
 
     return () => {
-      mounted = false;
-      stopCamera(streamRef.current);
+      if (detectionIntervalRef.current) {
+        clearInterval(detectionIntervalRef.current);
+      }
+      if (countdownRef.current) {
+        clearInterval(countdownRef.current);
+      }
+      window.removeEventListener('resize', resizeCanvas);
     };
-  }, [onCameraReady, onCameraError]);
+  }, [isTfReady, isVideoReady, detectFaces, onAlignmentUpdate, onFaceCaptured, countdown]);
 
   if (hasError) {
     return (
-      <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-zinc-900">
-        <div className="text-center text-white px-4">
-          <p className="text-sm mb-2">Tidak dapat mengakses kamera</p>
-          <p className="text-xs text-zinc-400">Pastikan izin kamera telah diberikan</p>
+      <div className="flex items-center justify-center h-full bg-gray-900 text-white">
+        <div className="text-center">
+          <p className="text-xl mb-4">⚠️ Gagal mengakses kamera</p>
+          <p className="text-sm text-gray-400">Pastikan kamera terhubung dan izin diberikan</p>
         </div>
       </div>
     );
   }
 
   return (
-    <>
+    <div className="relative w-full h-full bg-black">
+      {isLoading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-900 text-white z-10">
+          <div className="text-center">
+            <p className="text-xl mb-2">⏳ Memuat kamera...</p>
+            <p className="text-sm text-gray-400">Mohon tunggu sebentar</p>
+          </div>
+        </div>
+      )}
+
       <video
         ref={videoRef}
         autoPlay
         playsInline
         muted
-        className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500`}
+        className="hidden"
       />
-      <canvas ref={canvasRef} className="hidden" />
+
+      <canvas
+        ref={canvasRef}
+        className="absolute inset-0 w-full h-full object-contain"
+      />
+
       <canvas
         ref={overlayCanvasRef}
-        className="absolute inset-0 w-full h-full pointer-events-none"
+        className="absolute inset-0 w-full h-full"
       />
 
-      {/* Countdown overlay */}
-      {countdown !== null && countdown > 0 && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="text-white text-center">
-            <div className="text-6xl font-bold mb-2">{countdown}</div>
-            <p className="text-sm">Foto akan diambil...</p>
+      {countdown !== null && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="text-9xl font-bold text-white drop-shadow-2xl">
+            {countdown}
           </div>
         </div>
       )}
-
-      {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-zinc-900">
-          <div className="text-white text-center">
-            <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-            <p className="text-xs">Memulai kamera...</p>
-          </div>
-        </div>
-      )}
-    </>
+    </div>
   );
 }

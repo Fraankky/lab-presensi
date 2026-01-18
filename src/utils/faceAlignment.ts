@@ -54,6 +54,8 @@ export function validateAlignment(
   const passedChecks = Object.values(checks).filter(Boolean).length;
   const score = (passedChecks / 4) * 100;
 
+  console.log("passedChecks:", passedChecks, "score:", score);
+
   // Generate feedback
   let feedback = 'Sempurna! 😊';
   if (!inGuide) feedback = 'Posisikan wajah di dalam kotak';
@@ -62,7 +64,7 @@ export function validateAlignment(
   else if (!eyesHorizontal) feedback = 'Luruskan kepala';
 
   return {
-    isAligned: passedChecks === 4,
+    isAligned: passedChecks === 2,
     score,
     feedback,
     checks,

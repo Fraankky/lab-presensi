@@ -37,7 +37,7 @@ export function FaceScanCard() {
 
   const handleFaceCaptured = (image: Blob) => {
     setScanState('loading');
-    scanFace({ image });
+    //scanFace({ image });
   };
 
   const isScanning = scanState === 'initial';
@@ -60,6 +60,7 @@ export function FaceScanCard() {
           <CameraFeed
             onFaceCaptured={handleFaceCaptured}
             onAlignmentUpdate={handleAlignmentUpdate}
+            isActive={isScanning}
           />
           <ScanOverlays isScanning={isScanning} isSuccess={isSuccess} isError={isError} />
           <LoadingOverlay isVisible={isLoading || isScanLoading} />

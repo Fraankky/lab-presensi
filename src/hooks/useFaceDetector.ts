@@ -1,3 +1,5 @@
+import '@tensorflow/tfjs-core';
+import '@tensorflow/tfjs-backend-webgl';
 import * as faceDetection from '@tensorflow-models/face-detection';
 import { useRef, useCallback } from 'react';
 
@@ -9,16 +11,14 @@ export function useFaceDetector() {
       const model = faceDetection.SupportedModels.MediaPipeFaceDetector;
 
       const detectorConfig: faceDetection.MediaPipeFaceDetectorTfjsModelConfig = {
-        runtime: 'tfjs', // Gunakan TFJS runtime
-        maxFaces: 1, // Untuk presensi, cukup 1 wajah
+        runtime: 'tfjs',
+        maxFaces: 1,
       };
 
-      detectorRef.current = await faceDetection.createDetector(
-        model,
-        detectorConfig
-      );
-
-      console.log('✅ Face detector loaded');
+      console.log('⏳ Loading MediaPipe Face Detector...');
+      detectorRef.current = await faceDetection.createDetector(model, detectorConfig);
+      
+      console.log('✅ Face detector loaded successfully');
       return true;
     } catch (error) {
       console.error('❌ Failed to load face detector:', error);
@@ -27,33 +27,59 @@ export function useFaceDetector() {
   }, []);
 
   const detectFaces = useCallback(async (
-    video: HTMLVideoElement
+    input: HTMLVideoElement | HTMLCanvasElement
   ): Promise<faceDetection.Face[]> => {
 
     if (!detectorRef.current) {
-      throw new Error('Detector not loaded');
-    }
-
-    // Pastikan video ready
-    if (video.readyState < 2) {
+      console.error('❌ Detector not initialized');
       return [];
     }
 
+    // Jika input adalah video, validasi
+    if (input instanceof HTMLVideoElement) {
+      if (input.readyState !== 4) {
+        console.warn('⚠️ Video not ready. ReadyState:', input.readyState);
+        return [];
+      }
+
+      if (input.videoWidth === 0 || input.videoHeight === 0) {
+        console.warn('⚠️ Video dimensions invalid:', {
+          width: input.videoWidth,
+          height: input.videoHeight
+        });
+        return [];
+      }
+
+      if (input.currentTime === 0) {
+        console.warn('⚠️ Video not playing yet. CurrentTime:', input.currentTime);
+        return [];
+      }
+    }
+
     try {
-      // Estimation config
       const estimationConfig: faceDetection.MediaPipeFaceDetectorTfjsEstimationConfig = {
-        flipHorizontal: false, // Set true jika pakai front camera
+        flipHorizontal: false,
       };
 
-      // Detect faces
-      const faces = await detectorRef.current.estimateFaces(
-        video,
-        estimationConfig
-      );
+      const faces = await detectorRef.current.estimateFaces(input, estimationConfig);
 
-      return faces;
+      // Filter faces dengan box yang valid
+      const validFaces = faces.filter(face => {
+        const box = face.box;
+        return box.width > 0 && box.height > 0 && box.xMax > 0 && box.yMax > 0;
+      });
+
+      if (validFaces.length > 0) {
+        console.log('✅ Detected', validFaces.length, 'valid face(s)');
+        console.log('📦 Box:', validFaces[0].box);
+        console.log('🎯 Keypoints:', validFaces[0].keypoints.length);
+      } else if (faces.length > 0) {
+        console.warn('⚠️ Detected face but box is invalid (all zeros)');
+      }
+
+      return validFaces;
     } catch (error) {
-      console.error('Detection error:', error);
+      console.error('❌ Detection error:', error);
       return [];
     }
   }, []);
