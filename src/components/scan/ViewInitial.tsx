@@ -14,7 +14,7 @@ export function ViewInitial({ feedback }: ViewInitialProps) {
         {feedback && (
           <p className="text-sm text-amber-600 font-medium">{feedback}</p>
         )}
-        <p className="text-s text-zinc-400 leading-relaxed tracking-tight">
+        <p className="text-s text-zinc-400 leading-relaxed tracking-tight ">
           Pastikan wajah terlihat jelas dan pencahayaan cukup terang.
         </p>
       </div>

@@ -12,7 +12,6 @@ type ScanState = 'initial' | 'loading' | 'success' | 'error';
 
 export function FaceScanCard() {
   const [scanState, setScanState] = useState<ScanState>('initial');
-  const [isCameraColored, setIsCameraColored] = useState(false);
   const [alignmentFeedback, setAlignmentFeedback] = useState<string>('');
 
   const { scanFace, isScanning: isScanLoading, scanResult, scanError } = useFaceScan();
@@ -23,19 +22,17 @@ export function FaceScanCard() {
       setScanState('success'); // eslint-disable-line react-hooks/set-state-in-effect
     }
     if (scanError) {
-      setScanState('error'); // eslint-disable-line react-hooks/set-state-in-effect
+      setScanState('error');
     }
   }, [scanResult, scanError]);
 
   const handleReset = () => {
     setScanState('initial');
-    setIsCameraColored(false);
     setAlignmentFeedback('');
   };
 
   const handleAlignmentUpdate = (result: { isAligned: boolean; feedback: string; score: number }) => {
     setAlignmentFeedback(result.feedback);
-    setIsCameraColored(result.isAligned);
   };
 
   const handleFaceCaptured = (image: Blob) => {
@@ -53,7 +50,7 @@ export function FaceScanCard() {
       {/* Header / Brand */}
       <header className="mb-6 text-center">
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Presensi Praktikum</h1>
-        <h6 className="text-md font-stretch-expanded tracking-tight text-zinc-500">Pastikan Wajah Anda Terlihat Jelas</h6>
+        <h6 className="text-md font-stretch-expanded tracking-tight text-zinc-500 ">Pastikan Wajah Anda Terlihat Jelas</h6>
       </header>
 
       {/* Card Component */}
@@ -61,7 +58,6 @@ export function FaceScanCard() {
         {/* Camera Preview Section */}
         <div className="relative bg-zinc-900 aspect-square w-full overflow-hidden flex flex-col items-center justify-center group min-h-120">
           <CameraFeed
-            isColored={isCameraColored}
             onFaceCaptured={handleFaceCaptured}
             onAlignmentUpdate={handleAlignmentUpdate}
           />
@@ -75,8 +71,8 @@ export function FaceScanCard() {
             <ViewInitial feedback={alignmentFeedback} />
           )}
 
-          {scanState === 'success' && (
-            <ViewSuccess onReset={handleReset} />
+          {scanState === 'success' && scanResult && (
+            <ViewSuccess onReset={handleReset} scanResult={scanResult} />
           )}
 
           {scanState === 'error' && (

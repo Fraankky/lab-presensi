@@ -1,28 +1,5 @@
-export const captureFrame = (
-  videoElement: HTMLVideoElement,
-  canvasElement: HTMLCanvasElement
-): Promise<Blob | null> => {
-  return new Promise((resolve) => {
-    const context = canvasElement.getContext('2d');
-
-    if (!context) {
-      resolve(null);
-      return;
-    }
-
-    canvasElement.width = videoElement.videoWidth;
-    canvasElement.height = videoElement.videoHeight;
-    context.drawImage(videoElement, 0, 0);
-
-    canvasElement.toBlob(
-      (blob) => resolve(blob),
-      'image/jpeg',
-      0.95
-    );
-  });
-};
-
 export const initializeCamera = async (): Promise<MediaStream> => {
+
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
       video: {

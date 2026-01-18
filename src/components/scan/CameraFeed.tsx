@@ -10,7 +10,6 @@ import { cropAndResizeFace } from '../../utils/imageCropping';
 import type { AlignmentGuide } from '../../types/faceDetection.types';
 
 interface CameraFeedProps {
-  isColored: boolean;
   onCameraReady?: (video: HTMLVideoElement, canvas: HTMLCanvasElement) => void;
   onCameraError?: (error: string) => void;
   onFaceCaptured?: (image: Blob) => void;

@@ -1,10 +1,15 @@
 import { Icon } from '../ui/Icon';
+import type { ScanFaceResponse } from '../../types/scan.types';
 
 interface ViewSuccessProps {
   onReset: () => void;
+  scanResult: ScanFaceResponse;
 }
 
-export function ViewSuccess({ onReset }: ViewSuccessProps) {
+export function ViewSuccess({ onReset, scanResult }: ViewSuccessProps) {
+  const userName = scanResult.user?.nama || 'Tidak diketahui';
+  const userNim = scanResult.user?.nim || 'Tidak diketahui';
+
   return (
     <div className="flex flex-col gap-4">
       <div className="p-3 bg-emerald-50/50 border border-emerald-100 rounded-md flex items-start gap-3">
@@ -22,13 +27,13 @@ export function ViewSuccess({ onReset }: ViewSuccessProps) {
               <p className="text-xs uppercase tracking-wider text-emerald-600/70 font-medium mb-0.5">
                 Nama
               </p>
-              <p className="text-s font-medium text-zinc-800">Budi Santoso</p>
+              <p className="text-s font-medium text-zinc-800">{userName}</p>
             </div>
             <div>
               <p className="text-xs uppercase tracking-wider text-emerald-600/70 font-medium mb-0.5">
                 NIM
               </p>
-              <p className="text-s font-mono text-zinc-600">2300018225</p>
+              <p className="text-s font-mono text-zinc-600">{userNim}</p>
             </div>
           </div>
         </div>

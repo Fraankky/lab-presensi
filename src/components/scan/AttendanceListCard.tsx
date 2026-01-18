@@ -27,7 +27,7 @@ export function AttendanceListCard() {
       </CardHeader>
 
       <CardContent className="p-0">
-        <ScrollArea className="h-87,5 px-6">
+        <ScrollArea className="h-87.5 px-6">
           <div className="space-y-4 pb-6">
             {attendanceList.map((student) => (
               <div key={student.id} className="group">

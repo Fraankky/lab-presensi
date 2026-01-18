@@ -1,7 +1,23 @@
 import type { FaceDetectionResult } from '../types/faceDetection.types';
 
-export function parseFaceDetection(face: any): FaceDetectionResult {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+interface MediaPipeFaceDetection {
+  box: {
+    xMin: number;
+    yMin: number;
+    xMax: number;
+    yMax: number;
+    width: number;
+    height: number;
+  };
+  keypoints: Array<{
+    x: number;
+    y: number;
+    name?: string;
+  }>;
+  score?: number;
+}
+
+export function parseFaceDetection(face: MediaPipeFaceDetection): FaceDetectionResult {
   return {
     boundingBox: {
       xMin: face.box.xMin,
