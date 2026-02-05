@@ -3,6 +3,8 @@ import type { AlignmentGuide } from '../types/faceDetection.types';
 export async function cropAndResizeFace(
   video: HTMLVideoElement,
   guide: AlignmentGuide,
+  canvasWidth: number,
+  canvasHeight: number,
   targetWidth: number = 300,
   targetHeight: number = 400
 ): Promise<Blob> {
@@ -11,19 +13,53 @@ export async function cropAndResizeFace(
   const tempCanvas = document.createElement('canvas');
   const ctx = tempCanvas.getContext('2d')!;
 
-  // Set canvas size to guide dimensions
-  tempCanvas.width = guide.width;
-  tempCanvas.height = guide.height;
+  // Transform guide coordinates from canvas space to video space
+  const videoWidth = video.videoWidth;
+  const videoHeight = video.videoHeight;
 
-  // Calculate source coordinates in video
-  const guideLeft = guide.x - guide.width / 2;
-  const guideTop = guide.y - guide.height / 2;
+  // Calculate how video is scaled/positioned in canvas (same logic as drawVideoFrame)
+  const videoAspectRatio = videoWidth / videoHeight;
+  const canvasAspectRatio = canvasWidth / canvasHeight;
 
-  // Draw cropped area from video
+  let drawWidth: number, drawHeight: number, offsetX: number, offsetY: number;
+
+  if (videoAspectRatio > canvasAspectRatio) {
+    // Video is wider - fit to height
+    drawHeight = canvasHeight;
+    drawWidth = drawHeight * videoAspectRatio;
+    offsetX = (canvasWidth - drawWidth) / 2;
+    offsetY = 0;
+  } else {
+    // Video is taller - fit to width
+    drawWidth = canvasWidth;
+    drawHeight = drawWidth / videoAspectRatio;
+    offsetX = 0;
+    offsetY = (canvasHeight - drawHeight) / 2;
+  }
+
+  // Scale factor from canvas to video
+  const scaleX = videoWidth / drawWidth;
+  const scaleY = videoHeight / drawHeight;
+
+  // Guide coordinates in canvas space
+  const guideLeftCanvas = guide.x - guide.width / 2;
+  const guideTopCanvas = guide.y - guide.height / 2;
+
+  // Transform to video space
+  const sourceX = (guideLeftCanvas - offsetX) * scaleX;
+  const sourceY = (guideTopCanvas - offsetY) * scaleY;
+  const sourceWidth = guide.width * scaleX;
+  const sourceHeight = guide.height * scaleY;
+
+  // Set temp canvas size
+  tempCanvas.width = sourceWidth;
+  tempCanvas.height = sourceHeight;
+
+  // Draw cropped area from video (using transformed coordinates)
   ctx.drawImage(
     video,
-    guideLeft, guideTop, guide.width, guide.height, // Source
-    0, 0, guide.width, guide.height // Destination
+    sourceX, sourceY, sourceWidth, sourceHeight, // Source (video space)
+    0, 0, sourceWidth, sourceHeight // Destination
   );
 
   // Resize to target dimensions
@@ -34,7 +70,7 @@ export async function cropAndResizeFace(
 
   resizeCtx.drawImage(
     tempCanvas,
-    0, 0, guide.width, guide.height,
+    0, 0, sourceWidth, sourceHeight,
     0, 0, targetWidth, targetHeight
   );
 

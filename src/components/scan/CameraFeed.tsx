@@ -26,13 +26,15 @@ export function CameraFeed({
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const detectionIntervalRef = useRef<number | null>(null);
-  const countdownRef = useRef<number | null>(null);
+  const countdownIntervalRef = useRef<number | null>(null);
+  const isCountingDownRef = useRef(false);
 
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [isTfReady, setIsTfReady] = useState(false);
   const [isVideoReady, setIsVideoReady] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [isCapturing, setIsCapturing] = useState(false);
 
   const { detectFaces, loadModel } = useFaceDetector();
 
@@ -141,28 +143,54 @@ export function CameraFeed({
       height: overlayCanvas.height * 0.75,
     };
 
+    const cancelCountdown = () => {
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+        countdownIntervalRef.current = null;
+      }
+      isCountingDownRef.current = false;
+      setCountdown(null);
+    };
+
     const startCountdown = () => {
+      if (isCountingDownRef.current) return; // Prevent multiple countdowns
+
+      isCountingDownRef.current = true;
       setCountdown(3);
       let count = 3;
-      countdownRef.current = setInterval(() => {
+
+      countdownIntervalRef.current = setInterval(() => {
         count--;
         setCountdown(count);
         if (count <= 0) {
+          // Clear interval FIRST before async operation
+          if (countdownIntervalRef.current) {
+            clearInterval(countdownIntervalRef.current);
+            countdownIntervalRef.current = null;
+          }
           captureFace();
         }
       }, 1000) as unknown as number;
     };
 
     const captureFace = async () => {
+      if (isCapturing) return; // Prevent multiple captures
+      setIsCapturing(true);
+
       try {
-        const imageBlob = await cropAndResizeFace(video, guide);
+        const imageBlob = await cropAndResizeFace(
+          video,
+          guide,
+          canvas.width,
+          canvas.height
+        );
         onFaceCaptured?.(imageBlob);
-        setCountdown(null);
-        if (countdownRef.current) {
-          clearInterval(countdownRef.current);
-        }
       } catch (error) {
         console.error('Capture error:', error);
+      } finally {
+        setCountdown(null);
+        isCountingDownRef.current = false;
+        setIsCapturing(false);
       }
     };
 
@@ -224,6 +252,10 @@ export function CameraFeed({
         
         // Skip jika tidak ada face atau face invalid
         if (faces.length === 0) {
+          // Cancel countdown if face is lost
+          if (isCountingDownRef.current) {
+            cancelCountdown();
+          }
           onAlignmentUpdate?.({
             isAligned: false,
             feedback: 'Wajah tidak terdeteksi',
@@ -252,8 +284,11 @@ export function CameraFeed({
         drawGuideOverlay(overlayCanvas, guide, guideColor);
         drawFaceBoundingBox(overlayCanvas, transformedFace);
 
-        if (alignment.isAligned && countdown === null) {
+        if (alignment.isAligned && !isCountingDownRef.current && !isCapturing) {
           startCountdown();
+        } else if (!alignment.isAligned && isCountingDownRef.current) {
+          // Cancel countdown if alignment is lost
+          cancelCountdown();
         }
       } catch (error) {
         console.error('Detection loop error:', error);
@@ -267,12 +302,12 @@ export function CameraFeed({
       if (detectionIntervalRef.current) {
         clearInterval(detectionIntervalRef.current);
       }
-      if (countdownRef.current) {
-        clearInterval(countdownRef.current);
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
       }
       window.removeEventListener('resize', resizeCanvas);
     };
-  }, [isTfReady, isVideoReady, detectFaces, onAlignmentUpdate, onFaceCaptured, countdown]);
+  }, [isTfReady, isVideoReady, detectFaces, onAlignmentUpdate, onFaceCaptured, isCapturing]);
 
   if (hasError) {
     return (

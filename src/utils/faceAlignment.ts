@@ -64,7 +64,7 @@ export function validateAlignment(
   else if (!eyesHorizontal) feedback = 'Luruskan kepala';
 
   return {
-    isAligned: passedChecks === 2,
+    isAligned: passedChecks >= 3,
     score,
     feedback,
     checks,
